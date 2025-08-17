@@ -1,0 +1,54 @@
+.login-container {
+    position: relative;
+    background-image: url('../Assets/canva.jpg'); 
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+  }
+  
+  /* Dark overlay for better text contrast */
+  .login-container::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5); /* Dark overlay */
+    backdrop-filter: blur(5px); /* Slight blur for depth */
+  }
+  
+  /* Centered login box */
+  .login-box {
+    position: relative;
+    background: rgba(255, 255, 255, 0.15); /* Semi-transparent white */
+    padding: 40px;
+    border-radius: 15px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    text-align: center;
+    color: white;
+    backdrop-filter: blur(10px); /* Glass effect */
+    max-width: 500px;
+    width: 90%;
+  }
+  
+  /* Heading style */
+  .login-box h2 {
+    font-size: 28px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 20px;
+  }
+  
+  /* Styling for inner content */
+  .login-box p {
+    font-size: 16px;
+    margin-bottom: 10px;
+  }
+  

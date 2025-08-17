@@ -1,0 +1,474 @@
+from django.shortcuts import render
+from .models import CustomUser,Teachers,Students,Message
+from rest_framework.views import APIView
+
+from .serializers import UserSerializer,TeacherSerializer,StudentSerializer,MessageSerializer,CourseSerializer,EventSerializer
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.response import Response
+from rest_framework import status
+from django.contrib.auth import authenticate
+
+
+from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from .models import Teachers, Students,Course,Event
+
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from .models import Teachers, Students
+from django.shortcuts import get_object_or_404
+
+
+
+class EventView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            print(" Request Files:", request.FILES)
+
+            teacher_name = request.data.get("teachername")
+            if not teacher_name:
+                return Response({"error": "Teacher name is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+            teacher = get_object_or_404(Teachers, teachername=teacher_name)
+
+            data = request.data.copy()
+            data["teachername"] = teacher.id  
+
+            attachment = request.FILES.get("attachment")
+            if attachment:
+                print(f"✅ Attachment received: {attachment.name}")
+
+               
+                event_instance = Event.objects.create(
+                    teachername=teacher,
+                    event_name=request.data.get("event_name"),
+                    organizer=request.data.get("organizer"),
+                    email=request.data.get("email"),
+                    phone=request.data.get("phone"),
+                    date=request.data.get("date"),
+                    time=request.data.get("time"),
+                    venue=request.data.get("venue"),
+                    description=request.data.get("description"),
+                    event_type=request.data.get("event_type"),
+                    attachment=attachment  # Save the file
+                )
+
+                print(f" File saved at: {event_instance.attachment.path}")
+
+                serializer = EventSerializer(event_instance)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            print(f" Error: {e}")
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+       
+        
+    def get(self, request):
+        teacher_name = request.GET.get("teachername")  
+
+        if not teacher_name:
+            return Response({"error": "Teacher name is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        teacher = get_object_or_404(Teachers, teachername=teacher_name)
+
+        
+        events = Event.objects.filter(teachername=teacher)  
+
+        if not events.exists():
+            return Response({"message": "No events found for this teacher"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = EventSerializer(events, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    
+    def delete(self,request,eventname):
+        print("event name:",eventname)
+        try:
+            events=Event.objects.filter(event_name=eventname)
+            events.delete()
+            return Response({"message": f"Deleted event with eventname {eventname}"}, status=status.HTTP_204_NO_CONTENT)
+        except Teachers.DoesNotExist:
+            return Response({"error": "event not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+
+class CourseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            teacher_name = request.data.get("teachername")
+            if not teacher_name:
+                return Response({"error": "Teacher name is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+            
+            teacher = get_object_or_404(Teachers, teachername=teacher_name)
+
+            data = request.data.copy()
+            data["teachername"] = teacher.id  
+
+            
+            if "attachment" in request.FILES:
+                data["attachment"] = request.FILES["attachment"]
+
+            
+            serializer = CourseSerializer(data=data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+    def get(self, request):
+        teacher_name = request.GET.get("teachername")  
+
+        if not teacher_name:
+            return Response({"error": "Teacher name is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        teacher = get_object_or_404(Teachers, teachername=teacher_name)
+
+        
+        courses = Course.objects.filter(teachername=teacher)  
+
+        if not courses.exists():
+            return Response({"message": "No courses found for this teacher"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = CourseSerializer(courses, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+
+
+    def delete(self,request,coursename):
+        print("course name:",coursename)
+        try:
+            courses=Course.objects.filter(name=coursename)
+            courses.delete()
+            return Response({"message": f"Deleted course with coursename {coursename}"}, status=status.HTTP_204_NO_CONTENT)
+        except Teachers.DoesNotExist:
+            return Response({"error": "course not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+    
+    
+
+       
+class TeacherCreateView(APIView):
+    permission_classes = [IsAuthenticated]  
+
+    def post(self, request, *args, **kwargs):
+        
+        request.data['admin'] = request.user.id 
+
+        serializer = TeacherSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class TeacherView(APIView):
+    
+    def get(self,request):
+        
+        obj=Teachers.objects.filter(admin=request.user)
+        serializer=TeacherSerializer(obj,many=True)
+        return Response({'data':serializer.data})
+
+    def delete(self,request,teacher_name):
+        try:
+            teacher = Teachers.objects.get(teachername=teacher_name)
+            teacher.delete()
+            return Response({"message": f"Deleted teacher with name {teacher_name}"}, status=status.HTTP_204_NO_CONTENT)
+        except Teachers.DoesNotExist:
+            return Response({"error": "Teacher not found"}, status=status.HTTP_404_NOT_FOUND)
+
+class CreateUserView(APIView):
+    permission_classes = [AllowAny]
+    def post(self,request):
+        serializer=UserSerializer(data=request.data)
+        if serializer.is_valid():
+            user=serializer.save()
+            user.set_password(serializer.validated_data["password"])
+            user.save()
+            refresh = RefreshToken.for_user(user)
+            return Response({"refresh": str(refresh),"access": str(refresh.access_token),"username": user.username}, status=201)
+        return Response(serializer.errors, status=400)
+
+
+class AdminLoginView(APIView):
+    permission_classes = [AllowAny]
+    def post(self,request):
+        username=request.data.get("username")
+        password=request.data.get("password")
+
+        user = authenticate(request, username=username, password=password) 
+        if user:
+            refresh = RefreshToken.for_user(user)
+            return Response({
+                "refresh": str(refresh),
+                "access": str(refresh.access_token),
+                "username": user.username
+            })
+        return Response({"error": "Invalid credentials"}, status=400)
+    
+from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
+from .models import Teachers, CustomUser
+
+class TeacherLoginView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        
+        teachername = request.data.get("teachername")
+        password = request.data.get("password")
+
+        print(f"Attempting to log in teacher: {teachername}")
+
+        
+        teacher = Teachers.objects.filter(teachername=teachername).first()
+
+        if teacher:
+            print(f"Teacher found: {teacher.teachername}")
+            
+            user = teacher.admin  
+            if user and user.check_password(password):  
+                print(f"Password correct for user {user.username}")
+               
+                refresh = RefreshToken.for_user(user)
+                print(f"Generated token for {user.username}")
+
+                
+                return Response({
+                    "message": "Login successful",
+                    "teachername": teacher.teachername,
+                    "access_token": str(refresh.access_token),
+                    "refresh_token": str(refresh)
+                }, status=200)
+            else:
+                print(f"Incorrect password for teacher: {teachername}")
+        else:
+            print(f"Teacher not found: {teachername}")
+
+       
+        return Response({"message": "Invalid credentials"}, status=401)
+
+
+
+class StudentView(APIView):
+    
+    permission_classes = [IsAuthenticated]  
+
+    def post(self, request, *args, **kwargs):
+        
+        request.data['admin'] = request.user.id 
+
+        serializer = StudentSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def get(self,request):
+        
+        obj=Students.objects.filter(admin=request.user)
+        serializer=StudentSerializer(obj,many=True)
+        return Response({'data':serializer.data})
+
+    def delete(self,request,student_name):
+        try:
+            student = Students.objects.get(studentname=student_name)
+            student.delete()
+            return Response({"message": f"Deleted student with name {student_name}"}, status=status.HTTP_204_NO_CONTENT)
+        except Students.DoesNotExist:
+            return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+class StudentLoginView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        
+        studentname = request.data.get("studentname")
+        password = request.data.get("password")
+
+        print(f"Attempting to log in student: {studentname}")
+
+        
+        student = Students.objects.filter(studentname=studentname).first()
+
+        if student:
+            print(f"student found: {student.studentname}")
+            
+            user = student.admin  
+            if user and user.check_password(password):  
+                print(f"Password correct for user {user.username}")
+                
+                refresh = RefreshToken.for_user(user)
+                print(f"Generated token for {user.username}")
+
+                
+                return Response({
+                    "message": "Login successful",
+                    "studentname": student.studentname,
+                    "access_token": str(refresh.access_token),
+                    "refresh_token": str(refresh)
+                }, status=200)
+            else:
+                print(f"Incorrect password for student: {studentname}")
+        else:
+            print(f"student not found: {studentname}")
+
+       
+        return Response({"message": "Invalid credentials"}, status=401)
+
+    
+
+from rest_framework.permissions import IsAuthenticated
+
+class MessageView(APIView):
+    permission_classes = [IsAuthenticated] 
+    def get(self, request):
+        user = request.user  
+
+        if hasattr(user, "teachers"):
+            messages = Message.objects.filter(sender=user) | Message.objects.filter(receiver=user)
+        elif hasattr(user, "students"):
+            messages = Message.objects.filter(receiver=user)
+        else:  
+            messages = Message.objects.filter(sender=user) | Message.objects.filter(receiver__collagename=user.collagename)
+
+        serializer = MessageSerializer(messages, many=True)
+        return Response(serializer.data, status=200)
+
+    def post(self, request):
+        serializer = MessageSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=201)
+        return Response(serializer.errors, status=400)
+
+
+from rest_framework import generics, permissions
+from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes
+from django.contrib.auth.models import User
+from .models import Message
+from .serializers import MessageSerializer
+
+# Get messages for a user
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from connect.models import Message
+from django.contrib.auth.models import User
+import json
+@csrf_exempt
+def get_messages(request):
+    if request.method == "GET":
+        messages = Message.objects.all().order_by("-timestamp")  # Order by latest first
+
+        if not messages.exists():
+            print("No messages found")  # Debugging message
+            return JsonResponse([], safe=False)
+
+        message_list = [
+            {
+                "id": msg.id,
+                "sender": msg.sender.username,
+                "sender_name":msg.sender_name,
+                "receiver": msg.receiver.username if msg.receiver else "All",
+                "content": msg.content,
+                "timestamp": msg.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                "role": msg.role  # Include the role in the response
+            }
+            for msg in messages
+        ]
+        
+        return JsonResponse(message_list, safe=False)
+
+@api_view(["POST"])
+@permission_classes([permissions.IsAuthenticated])
+def send_message(request):
+    data = request.data
+    content = data.get("content")
+    receiver_id = data.get("receiver")  
+    message_type = data.get("message_type", "group")  
+    sender = request.user  
+    sender_name1=data.get("sender")
+    role1=data.get("role")
+
+    if not content:
+        return Response({"error": "Content is required"}, status=400)
+
+    sender_name = sender.username  
+    role = "Admin"  
+
+    print(f"Checking user: {sender_name1} {role1}")
+    # ✅ Debugging Statements
+    print(f"Checking user: {sender.username} (ID: {sender.id})")
+
+    # **Ensure correct role is assigned**
+    if sender.is_superuser or sender.is_staff:
+        role = "Admin"
+    elif Teachers.objects.filter(admin=sender).exists():
+        teacher = Teachers.objects.get(admin=sender)
+        sender_name = teacher.teachername  
+        role = "Teacher"
+    else:
+        # Debug student lookup
+        student = Students.objects.filter(admin=sender).first()
+        if student:
+            sender_name = student.studentname  
+            role = "Student"
+        else:
+            print(f"❌ No matching student found for {sender.username}")
+
+    print(f"✅ Message from: {sender_name} ({role})")  # Debugging
+
+    receiver = None
+    if receiver_id and receiver_id != "All":
+        try:
+            receiver = CustomUser.objects.get(id=receiver_id)
+        except CustomUser.DoesNotExist:
+            return Response({"error": "Invalid receiver ID"}, status=400)
+
+    message = Message.objects.create(
+        sender=sender,
+        sender_name=sender_name1,
+        receiver=receiver,
+        content=content,
+        message_type=message_type,
+        role=role1
+    )
+
+    return Response(MessageSerializer(message).data, status=201)
+
+
+
+@api_view(["PATCH"])
+@permission_classes([permissions.IsAuthenticated])
+def mark_as_read(request, message_id):
+    try:
+        message = Message.objects.get(id=message_id)
+
+        # Ensure only intended receiver marks the message as read
+        if message.receiver and message.receiver != request.user:
+            return Response({"error": "You are not authorized to mark this message as read."}, status=403)
+
+        message.read_status = True
+        message.save()
+        return Response({"message": "Message marked as read."})
+    except Message.DoesNotExist:
+        return Response({"error": "Message not found."}, status=404)
+
+
+
