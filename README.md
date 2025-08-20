@@ -35,7 +35,7 @@ It enables Admins, Teachers, and Students to connect seamlessly, share updates, 
 
 ### 🔹 Clone the repository
 bash
-git clone https://github.com/23335a0504raju/CampusColab.git
+git clone [https://github.com/renuka-club/CampusColab.git](https://github.com/renuka-club/CampusColab.git)
 cd CampusColab
 
 
